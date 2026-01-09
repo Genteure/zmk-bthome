@@ -296,4 +296,4 @@ static int zmk_bthome_init(void)
     return 0;
 }
 
-SYS_INIT(zmk_bthome_init, APPLICATION, CONFIG_ZMK_BLE_INIT_PRIORITY);
+SYS_INIT(zmk_bthome_init, APPLICATION, CONFIG_APPLICATION_INIT_PRIORITY);
