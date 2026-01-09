@@ -1,0 +1,47 @@
+menuconfig ZMK_BTHOME
+	bool "ZMK BTHome support"
+	depends on ZMK_BLE
+    select BT_EXT_ADV
+	help
+	  Enable sending BTHome sensor data over Bluetooth Low Energy
+	  (BLE) advertisements from ZMK-powered keyboards.
+
+if ZMK_BTHOME
+
+config ZMK_BTHOME_BATTERY_LEVEL
+	bool "Report battery level"
+	default y
+    depends on ZMK_BATTERY_REPORTING
+	help
+	  Include battery level (percentage) in BTHome advertisements.
+	  Disable to omit this sensor from payloads.
+
+config ZMK_BTHOME_BATTERY_VOLTAGE
+	bool "Report battery voltage"
+	default y
+    depends on ZMK_BTHOME_BATTERY_LEVEL
+	help
+	  Include battery voltage in BTHome advertisements.
+	  Disable to omit this sensor from payloads.
+
+config ZMK_BTHOME_DEVICE_NAME
+	string "BTHome device name"
+	default ""
+	help
+	  Override the BTHome advertised device name (up to 15 characters).
+	  When empty, the name will default to CONFIG_ZMK_KEYBOARD_NAME if set,
+	  otherwise a MAC-derived value like "ZMK-XXXXXX" will be used.
+
+config ZMK_BTHOME_ENCRYPTION_KEY
+	string "BTHome encryption key (hex)"
+	default ""
+	help
+	  Provide a 16-byte key as 32 hexadecimal characters to enable
+	  BTHome v2 encryption. Leave empty to send unencrypted payloads.
+
+endif # ZMK_BTHOME
+
+config ZMK_BEHAVIOR_BTHOME_BUTTON
+	bool
+	default y
+	depends on DT_HAS_ZMK_BEHAVIOR_BTHOME_BUTTON_ENABLED

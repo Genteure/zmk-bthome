@@ -1,0 +1,7 @@
+# SPDX-License-Identifier: MIT
+
+description: BTHome button behavior
+
+compatible: "zmk,behavior-bthome-button"
+
+include: one_param.yaml

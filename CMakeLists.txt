@@ -1,0 +1,3 @@
+target_sources_ifdef(CONFIG_ZMK_BTHOME app PRIVATE src/zmk_bthome.c)
+target_sources_ifdef(CONFIG_ZMK_BEHAVIOR_BTHOME_BUTTON app PRIVATE src/behaviors/behavior_bthome_button.c)
+zephyr_include_directories(include)
