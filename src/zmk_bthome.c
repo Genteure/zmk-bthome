@@ -110,6 +110,25 @@ static void button_queue_work_handler(struct k_work *work)
 
     LOG_DBG("BTHome button event: index=%d code=0x%02x", evt.index, evt.code);
 
+    // Ensure the advertising set exists; create lazily once Bluetooth is ready
+    if (bthome_adv == NULL)
+    {
+        if (!bt_is_ready())
+        {
+            LOG_WRN("Bluetooth not ready; deferring BTHome adv setup");
+            return;
+        }
+
+        int rc_create = bt_le_ext_adv_create(BT_LE_EXT_ADV_NCONN_IDENTITY, &bthome_adv_cb, &bthome_adv);
+        if (rc_create != 0 || bthome_adv == NULL)
+        {
+            LOG_ERR("Failed to create BTHome advertiser in work: %d", rc_create);
+            return;
+        }
+
+        LOG_WRN("BTHome advertiser created lazily in work");
+    }
+
     // Clear all buttons, then set only the one from the event
     for (int i = 0; i < BTHOME_BUTTON_NUM; i++)
     {
@@ -292,6 +311,10 @@ static int zmk_bthome_init(void)
         // log error and ignore
         LOG_ERR("Failed to create BTHome advertiser: %d", rc);
     }
+
+    LOG_INF("BTHome initialized");
+
+    // TODO troubleshoot bt not ready at init time, id not yet loaded from settings by ZMK?
 
     return 0;
 }
