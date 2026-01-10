@@ -1,8 +1,8 @@
 # ZMK BTHome Module
 
-This [ZMK module](https://zmk.dev/docs/features/modules) adds support sending BTHome sensor data over Bluetooth Low Energy (BLE) advertisements.
+ZMK BTHome is a [ZMK module](https://zmk.dev/docs/features/modules) that adds support for sending sensor data and button events over Bluetooth Low Energy (BLE) using the BTHome protocol.
 
-[ZMK](https://zmk.dev/) is an open source, wireless-first keyboard firmware based on Zephyr RTOS.
+[ZMK](https://zmk.dev/) is an open source, wireless-first keyboard firmware based on Zephyr RTOS. It's modular and composable, making it easy to extend functionality through modules like this one.
 
 [BTHome](https://bthome.io/) is an open standard for transmitting sensor data and events over BLE, commonly used in smart home devices. [Home Assistant](https://www.home-assistant.io/integrations/bthome/) supports BTHome natively out of the box.
 

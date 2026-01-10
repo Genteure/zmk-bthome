@@ -122,7 +122,7 @@ static void zmkbthome_button_queue_work_handler(struct k_work *work)
             return;
         }
 
-        int rc_create = bt_le_ext_adv_create(BT_LE_EXT_ADV_NCONN_IDENTITY, &bthome_adv_cb, &bthome_adv);
+        int rc_create = bt_le_ext_adv_create(BT_LE_ADV_NCONN_IDENTITY, &bthome_adv_cb, &bthome_adv);
         if (rc_create != 0 || bthome_adv == NULL)
         {
             LOG_ERR("Failed to create BTHome advertiser in work: %d", rc_create);
