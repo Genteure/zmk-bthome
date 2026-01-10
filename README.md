@@ -21,6 +21,7 @@ In your keyboard's `.conf` file, enable the module:
 
 ```kconfig
 CONFIG_ZMK_BTHOME=y
+CONFIG_BT_EXT_ADV_MAX_ADV_SET=2
 ```
 
 ## Configuration
@@ -42,35 +43,39 @@ For split keyboards, each keyboard part will independently report its own batter
 
 Buttons are ZMK behaviors. Add any number of bthome button behaviors to your keymap.
 
-```dts
+```devicetree
+#include <dt-bindings/zmk_bthome/button.h>
+
 / {
     behaviors {
-        bthome0: bthome_button0 {
+        bthome0: bthome_button0 { // name can be anything, but ORDER matters
             compatible = "zmk,behavior-bthome-button";
             #binding-cells = <1>;
-            display-name = "BTHome Button 0";
+            display-name = "BTHome Button 1"; // Optional, shown in ZMK Studio
         };
         bthome1: bthome_button1 {
             compatible = "zmk,behavior-bthome-button";
             #binding-cells = <1>;
-            display-name = "BTHome Button 1";
+            display-name = "BTHome Button 2";
+        };
+        bthome2: bthome_button2 {
+            compatible = "zmk,behavior-bthome-button";
+            #binding-cells = <1>;
+            display-name = "BTHome Button 3";
         };
         // As many as you want...
+    };
+
+    keymap {
+        compatible = "zmk,keymap";
+        default_layer {
+            bindings = <&bthome0 BTHOME_BTN_PRESS &bthome1 BTHOME_BTN_TRIPLE_PRESS ...>;
+        };
     };
 };
 ```
 
-Then, reference them in your keymap:
-
-```dts
-#include <dt-bindings/zmk_bthome/button.h>
-
-...
-    default_layer {
-        bindings = <&bthome0 BTHOME_BTN_PRESS &bthome1 BTHOME_BTN_TRIPLE_PRESS ...>;
-    };
-...
-```
+IMPORTANT: The button index is determined by the order in which the behaviors are defined in your keymap, meaning if you have `bthome_a`, `bthome_b`, "A" will be button 1 and "B" will be button 2. If you have `bthome_b` defined before `bthome_a`, then "B" will be button 1 and "A" will be button 2.
 
 Possible button press types are:
 
@@ -86,9 +91,11 @@ Compose with ZMK built-in behaviors like hold-tap and tap-dance to create real "
 
 For split keyboards, button presses will be reported from the central side. After any changes on behaviors, make sure to flash all keyboard parts.
 
-Note the button index is determined by the order in which the behaviors are defined in your keymap, meaning if you have `bthome_a`, `bthome_b`, "A" will be button 0 and "B" will be button 1. If you have `bthome_b` defined before `bthome_a`, then "B" will be button 0 and "A" will be button 1.
+TODO support sending from the source side?
 
 ### Device Name
+
+TODO
 
 By default, the BTHome device name will be the value of `CONFIG_ZMK_KEYBOARD_NAME`. If that is not set, it will default to `ZMK-XXXXXX`, where `XXXXXX` are the last 6 digits of the device's MAC address.
 

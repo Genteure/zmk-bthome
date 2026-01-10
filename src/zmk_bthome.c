@@ -11,6 +11,7 @@
 #include <zephyr/bluetooth/bluetooth.h>
 #include <zephyr/bluetooth/uuid.h>
 #include <zephyr/device.h>
+#include <zephyr/device.h>
 #include <zephyr/devicetree.h>
 #include <zephyr/drivers/sensor.h>
 #include <zephyr/init.h>
@@ -41,7 +42,7 @@ struct zmk_bthome_obj16
 } __packed;
 
 // Number of buttons placeholder, to be replaced with actual number from devicetree
-#define BTHOME_BUTTON_NUM 6
+#define BTHOME_BUTTON_NUM DT_NUM_INST_STATUS_OKAY(zmk_behavior_bthome_button)
 
 struct zmk_bthome_payload
 {
@@ -81,19 +82,19 @@ struct zmk_bthome_button_event
 } __packed;
 
 #define BTHOME_BUTTON_QUEUE_SIZE 16
-K_MSGQ_DEFINE(bthome_button_msgq, sizeof(struct zmk_bthome_button_event), BTHOME_BUTTON_QUEUE_SIZE, 4);
-static void button_queue_work_handler(struct k_work *work);
-K_WORK_DEFINE(button_queue_work, button_queue_work_handler);
-static void bthome_adv_sent(struct bt_le_ext_adv *adv, struct bt_le_ext_adv_sent_info *info);
+K_MSGQ_DEFINE(zmkbthome_button_msgq, sizeof(struct zmk_bthome_button_event), BTHOME_BUTTON_QUEUE_SIZE, 4);
+static void zmkbthome_button_queue_work_handler(struct k_work *work);
+K_WORK_DEFINE(zmkhome_button_queue, zmkbthome_button_queue_work_handler);
+static void zmkbthome_adv_sent(struct bt_le_ext_adv *adv, struct bt_le_ext_adv_sent_info *info);
 
 static struct bt_le_ext_adv *bthome_adv;
 static bool bthome_adv_active;
 
 static const struct bt_le_ext_adv_cb bthome_adv_cb = {
-    .sent = bthome_adv_sent,
+    .sent = zmkbthome_adv_sent,
 };
 
-static void button_queue_work_handler(struct k_work *work)
+static void zmkbthome_button_queue_work_handler(struct k_work *work)
 {
     ARG_UNUSED(work);
 
@@ -103,19 +104,21 @@ static void button_queue_work_handler(struct k_work *work)
     }
 
     struct zmk_bthome_button_event evt;
-    if (k_msgq_get(&bthome_button_msgq, &evt, K_NO_WAIT) != 0)
+    if (k_msgq_get(&zmkbthome_button_msgq, &evt, K_NO_WAIT) != 0)
     {
         return;
     }
 
-    LOG_DBG("BTHome button event: index=%d code=0x%02x", evt.index, evt.code);
+    LOG_INF("BTHome sending button event: index=%d code=0x%02x", evt.index, evt.code);
 
-    // Ensure the advertising set exists; create lazily once Bluetooth is ready
+    // Not creating in SYS_INIT callback because bt_id is loaded after that
+    // and bt is not ready yet at that time. bt_le_ext_adv_create will return -EAGAIN.
     if (bthome_adv == NULL)
     {
         if (!bt_is_ready())
         {
             LOG_WRN("Bluetooth not ready; deferring BTHome adv setup");
+            // message is intentionally dropped, so we don't send a burst of ads later
             return;
         }
 
@@ -126,7 +129,7 @@ static void button_queue_work_handler(struct k_work *work)
             return;
         }
 
-        LOG_WRN("BTHome advertiser created lazily in work");
+        LOG_INF("BTHome advertiser created in work");
     }
 
     // Clear all buttons, then set only the one from the event
@@ -135,6 +138,8 @@ static void button_queue_work_handler(struct k_work *work)
         bthome_payload.data.buttons[i].data = BTHOME_BTN_NONE;
     }
 
+    // BTHOME_BTN_NONE come from battery updates,
+    // buttons array could have 0 elements if no buttons are configured.
     if (evt.code != BTHOME_BTN_NONE)
     {
         bthome_payload.data.buttons[evt.index].data = evt.code;
@@ -149,7 +154,7 @@ static void button_queue_work_handler(struct k_work *work)
         return;
     }
 
-    rc = bt_le_ext_adv_start(bthome_adv, BT_LE_EXT_ADV_START_PARAM(50, 3));
+    rc = bt_le_ext_adv_start(bthome_adv, BT_LE_EXT_ADV_START_PARAM(60, 5));
     if (rc == 0)
     {
         bthome_adv_active = true;
@@ -194,7 +199,7 @@ int zmk_bthome_queue_button_event(uint8_t index, uint8_t button_code)
         .code = button_code,
     };
 
-    int rc = k_msgq_put(&bthome_button_msgq, &evt, K_NO_WAIT);
+    int rc = k_msgq_put(&zmkbthome_button_msgq, &evt, K_NO_WAIT);
     if (rc != 0)
     {
         if (rc != -EAGAIN)
@@ -204,8 +209,8 @@ int zmk_bthome_queue_button_event(uint8_t index, uint8_t button_code)
 
         // Drop oldest to make room for newest, then retry
         struct zmk_bthome_button_event drop;
-        k_msgq_get(&bthome_button_msgq, &drop, K_NO_WAIT);
-        rc = k_msgq_put(&bthome_button_msgq, &evt, K_NO_WAIT);
+        k_msgq_get(&zmkbthome_button_msgq, &drop, K_NO_WAIT);
+        rc = k_msgq_put(&zmkbthome_button_msgq, &evt, K_NO_WAIT);
         if (rc != 0)
         {
             return rc;
@@ -214,17 +219,17 @@ int zmk_bthome_queue_button_event(uint8_t index, uint8_t button_code)
 
     LOG_DBG("Queued BTHome button event: index=%d code=0x%02x", evt.index, evt.code);
 
-    k_work_submit(&button_queue_work);
+    k_work_submit(&zmkhome_button_queue);
     return 0;
 }
 
-static void bthome_adv_sent(struct bt_le_ext_adv *adv, struct bt_le_ext_adv_sent_info *info)
+static void zmkbthome_adv_sent(struct bt_le_ext_adv *adv, struct bt_le_ext_adv_sent_info *info)
 {
     ARG_UNUSED(adv);
     ARG_UNUSED(info);
 
     bthome_adv_active = false;
-    k_work_submit(&button_queue_work);
+    k_work_submit(&zmkhome_button_queue);
 }
 
 #if IS_ENABLED(CONFIG_ZMK_BTHOME_BATTERY_LEVEL)
@@ -238,7 +243,7 @@ K_WORK_DEFINE(bthome_batt_work, bthome_batt_work_handler);
 int update_bthome_battery_voltage()
 {
     int rc;
-    rc = sensor_sample_fetch_chan(battery, SENSOR_CHAN_VOLTAGE);
+    rc = sensor_sample_fetch_chan(battery, SENSOR_CHAN_GAUGE_VOLTAGE);
     if (rc != 0)
     {
         LOG_DBG("Failed to fetch battery values: %d", rc);
@@ -246,7 +251,7 @@ int update_bthome_battery_voltage()
     }
 
     struct sensor_value voltage;
-    rc = sensor_channel_get(battery, SENSOR_CHAN_VOLTAGE, &voltage);
+    rc = sensor_channel_get(battery, SENSOR_CHAN_GAUGE_VOLTAGE, &voltage);
 
     if (rc != 0)
     {
@@ -268,7 +273,7 @@ static void bthome_batt_work_handler(struct k_work *work)
     if (rc != 0)
     {
         LOG_ERR("BTHome battery voltage update failed: %d", rc);
-        return;
+        // trigger an advertisement anyway to since battery level may have changed
     }
 
     // Push an advertisement with updated battery data
@@ -288,13 +293,15 @@ int batt_state_changed_listener(const zmk_event_t *eh)
     uint8_t battery_level = ev->state_of_charge;
     bthome_payload.data.battery_level.data = battery_level;
 
-    // Read voltage from sensor asynchronously (if enabled)
 #if IS_ENABLED(CONFIG_ZMK_BTHOME_BATTERY_VOLTAGE) && DT_HAS_CHOSEN(zmk_battery)
+    // Read voltage from sensor asynchronously (if enabled).
+    // If we have voltage reading enabled, delay sending
+    // the advertisement until we have the voltage too.
     k_work_submit(&bthome_batt_work);
-#endif
-
+#else
     // Queue a "no button" update to push battery change
     zmk_bthome_queue_button_event(0, BTHOME_BTN_NONE);
+#endif
 
     return ZMK_EV_EVENT_BUBBLE;
 }
@@ -302,21 +309,3 @@ ZMK_LISTENER(battery_changed, batt_state_changed_listener);
 ZMK_SUBSCRIPTION(battery_changed, zmk_battery_state_changed);
 
 #endif // CONFIG_ZMK_BTHOME_BATTERY_LEVEL
-
-static int zmk_bthome_init(void)
-{
-    int rc = bt_le_ext_adv_create(BT_LE_EXT_ADV_NCONN_IDENTITY, &bthome_adv_cb, &bthome_adv);
-    if (rc != 0)
-    {
-        // log error and ignore
-        LOG_ERR("Failed to create BTHome advertiser: %d", rc);
-    }
-
-    LOG_INF("BTHome initialized");
-
-    // TODO troubleshoot bt not ready at init time, id not yet loaded from settings by ZMK?
-
-    return 0;
-}
-
-SYS_INIT(zmk_bthome_init, APPLICATION, CONFIG_APPLICATION_INIT_PRIORITY);
