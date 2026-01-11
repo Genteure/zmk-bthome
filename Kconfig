@@ -8,6 +8,22 @@ menuconfig ZMK_BTHOME
 
 if ZMK_BTHOME
 
+config ZMK_BTHOME_ADV_TIMEOUT
+	int "BTHome advertisements timeout (10ms)"
+	default 100	
+	help
+	  Advertisement timeout (in 10ms units) for each BTHome event.
+	  Set to 0 to disable a timeout. Higher values increase reliability
+	  of delivery at the cost of longer advertisement duration.
+
+config ZMK_BTHOME_ADV_PACKETS
+	int "BTHome advertisements packets"
+	default 10	
+	help
+	  Number of advertisement "packets" (events) to send
+	  for each BTHome event. Higher values increase reliability
+	  of delivery at the cost of longer advertisement duration.
+
 config ZMK_BTHOME_BATTERY_LEVEL
 	bool "Report battery level"
 	default y

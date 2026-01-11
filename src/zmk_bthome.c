@@ -241,7 +241,7 @@ static void zmkbthome_button_queue_work_handler(struct k_work *work)
         return;
     }
 
-    rc = bt_le_ext_adv_start(bthome_adv, BT_LE_EXT_ADV_START_PARAM(100, 10));
+    rc = bt_le_ext_adv_start(bthome_adv, BT_LE_EXT_ADV_START_PARAM(CONFIG_ZMK_BTHOME_ADV_TIMEOUT, CONFIG_ZMK_BTHOME_ADV_PACKETS));
     if (rc == 0)
     {
         bthome_adv_active = true;
