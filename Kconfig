@@ -9,7 +9,7 @@ menuconfig ZMK_BTHOME
 if ZMK_BTHOME
 
 config ZMK_BTHOME_ADV_TIMEOUT
-	int "BTHome advertisements timeout (10ms)"
+	int "BTHome advertisements timeout (10ms units)"
 	default 100	
 	help
 	  Advertisement timeout (in 10ms units) for each BTHome event.

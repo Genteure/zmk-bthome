@@ -89,7 +89,54 @@ Possible button press types are:
 
 Compose with ZMK built-in behaviors like hold-tap and tap-dance to create real "multi-function" buttons, or simply put them on different keys and layers.
 
-For split keyboards, button presses will be reported from the central side. After any changes on behaviors, make sure to flash all keyboard parts.
+```devicetree
+// https://zmk.dev/docs/keymaps/behaviors/hold-tap
+/ {
+    behaviors {
+        htbth0: hold_tap_bthome0 {
+            compatible = "zmk,behavior-hold-tap";
+            #binding-cells = <2>;
+            flavor = "hold-preferred";
+            tapping-term-ms = <200>;
+            bindings = <&bthome0>, <&bthome0>;
+            display-name = "Hold-Tap BTHome Button 1";
+        };
+    };
+
+    keymap {
+        compatible = "zmk,keymap";
+        default_layer {
+            // Hold sends long press, tap sends press
+            bindings = <&htbth0 BTHOME_BTN_LONG_PRESS BTHOME_BTN_PRESS>;
+        };
+    };
+};
+```
+
+```devicetree
+// https://zmk.dev/docs/keymaps/behaviors/tap-dance
+/ {
+    behaviors {
+        tdbth0: tap_dance_bthome0 {
+            compatible = "zmk,behavior-tap-dance";
+            #binding-cells = <0>;
+            tapping-term-ms = <200>;
+            bindings = <&bthome0 BTHOME_BTN_PRESS>, <&bthome0 BTHOME_BTN_DOUBLE_PRESS>, <&bthome0 BTHOME_BTN_TRIPLE_PRESS>;
+        };
+    };
+
+    keymap {
+        compatible = "zmk,keymap";
+
+        default_layer {
+            // Single, double, and triple press
+            bindings = <&tdbth0>;
+        };
+    };
+};
+```
+
+For split keyboards, button presses will be reported from the central side.
 
 TODO support sending from the source side?
 
@@ -108,12 +155,57 @@ CONFIG_ZMK_BTHOME_DEVICE_NAME="My Keyboard Right"
 
 ### Encryption
 
-By default, BTHome advertisements are unencrypted. You can enable encryption by setting `CONFIG_ZMK_BTHOME_ENCRYPTION_KEY` in your keyboard's `.conf` file:
+By default, BTHome advertisements are unencrypted. You can enable encryption by setting the following options in your keyboard's `.conf` file:
 
 ```kconfig
+CONFIG_ZMK_BTHOME_ENCRYPTION=y
 # 16-byte (32 hex characters) encryption key
 CONFIG_ZMK_BTHOME_ENCRYPTION_KEY="00112233445566778899AABBCCDDEEFF"
 ```
+
+Home Assistant will prompt you to enter the bind key (a.k.a. encryption key) in the Integrations/Devices page.
+
+Here's a cryptographically secure one-liner to paste into your browser console:
+
+```js
+[...crypto.getRandomValues(new Uint8Array(16))].map(b => b.toString(16).padStart(2, '0')).join('')
+```
+
+### Size Limitations
+
+BLE advertisement packets have a maximum size of 31 bytes. There are 5 bytes of required protocol overhead, another 5 bytes for the BTHome header, leaving 21 bytes for the actual payload.
+
+- Battery Level: 2 bytes
+- Battery Voltage: 3 bytes
+- Button: 2 bytes each
+- Encryption: 8 bytes if enabled
+
+If `CONFIG_ZMK_BTHOME_DEVICE_NAME` is set, that takes up additional `sizeof(CONFIG_ZMK_BTHOME_DEVICE_NAME) + 2` bytes in the advertisement packet.
+
+If the total data exceeds the size limit, we will fail to build with the error:
+
+TODO build time size checking not yet implemented
+
+```txt
+ERROR: BTHome payload size (xx bytes for name + xx bytes for payload) exceeds maximum advertisement packet size (26 bytes)
+```
+
+### Advertising Parameters
+
+You can customize the advertising timeout and number of packets sent per interval by setting the following options in your keyboard's `.conf` file:
+
+```kconfig
+# Advertising timeout in units of 10 ms (default: 100, i.e., 1000 ms)
+CONFIG_ZMK_BTHOME_ADV_TIMEOUT=100
+# Number of advertising packets sent per interval (default: 10)
+CONFIG_ZMK_BTHOME_ADV_PACKETS=10
+```
+
+By default, each BTHome event is advertised for up to 1 second (100 * 10 ms) or up to 10 times during that period, whichever comes first. Multiple BTHome events occurring right after each other will be queued and advertised sequentially.
+
+You can adjust these values to balance between time spent advertising each BTHome event and reliability of receiving the advertisements. Too low values may result in missed events.
+
+(We're using "events" to refer to BTHome events. To avoid confusion, we use "packets" to refer to what Zephyr calls "advertising events".)
 
 ## License
 
@@ -121,4 +213,4 @@ This project is licensed under the MIT License. See the [LICENSE](LICENSE) file 
 
 ## Credits
 
-TODO
+- <https://github.com/jeffrizzo/bthome-zephyr>
