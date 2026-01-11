@@ -32,6 +32,16 @@ config ZMK_BTHOME_DEVICE_NAME
 	  When empty, the name will default to CONFIG_ZMK_KEYBOARD_NAME if set,
 	  otherwise a MAC-derived value like "ZMK-XXXXXX" will be used.
 
+config ZMK_BTHOME_ENCRYPTION
+	bool "Enable BTHome encryption"
+	default n
+	select CRYPTO
+	select CRYPTO_MBEDTLS_SHIM
+	select MBEDTLS_CIPHER_CCM_ENABLED
+	help
+	  Enable BTHome v2 encryption for sensor payloads. Requires setting
+	  ZMK_BTHOME_ENCRYPTION_KEY to a valid 16-byte key.
+
 config ZMK_BTHOME_ENCRYPTION_KEY
 	string "BTHome encryption key (hex)"
 	default ""

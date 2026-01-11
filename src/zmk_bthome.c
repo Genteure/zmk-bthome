@@ -18,6 +18,7 @@
 #include <zephyr/kernel.h>
 #include <zephyr/sys/byteorder.h>
 #include <zephyr/sys/util.h>
+#include <zephyr/random/random.h>
 
 #include <zmk/battery.h>
 #include <zmk/event_manager.h>
@@ -44,6 +45,10 @@ struct zmk_bthome_obj16
 // Number of buttons placeholder, to be replaced with actual number from devicetree
 #define BTHOME_BUTTON_NUM DT_NUM_INST_STATUS_OKAY(zmk_behavior_bthome_button)
 
+// uuid(2) + device_info(1)
+#define PAYLOAD_CONTENT_OFFSET 3
+#define PAYLOAD_CONTENT_SIZE (sizeof(struct zmk_bthome_payload) - PAYLOAD_CONTENT_OFFSET)
+
 struct zmk_bthome_payload
 {
     const uint8_t uuid[2];
@@ -69,10 +74,42 @@ static union
     },
 };
 
+#if IS_ENABLED(CONFIG_ZMK_BTHOME_ENCRYPTION)
+
+struct zmk_bthome_encrypted_payload
+{
+    const uint8_t uuid[2];
+    const uint8_t device_info;
+    uint8_t encrypted_data[PAYLOAD_CONTENT_SIZE];
+    // little endian counter
+    uint32_t counter;
+    // Message Integrity Check (4 bytes)
+    uint8_t mic[BTHOME_ENCRYPT_TAG_LEN];
+} __packed;
+
+static union
+{
+    struct zmk_bthome_encrypted_payload data;
+    uint8_t bytes[sizeof(struct zmk_bthome_encrypted_payload)];
+} bthome_encrypted_payload = {
+    .data = {
+        .uuid = {BT_UUID_16_ENCODE(ZMK_BTHOME_SERVICE_UUID)},
+        .device_info = ZMK_BTHOME_DEVICE_INFO,
+    },
+};
+
+#endif // IS_ENABLED(CONFIG_ZMK_BTHOME_ENCRYPTION)
+
+#if IS_ENABLED(CONFIG_ZMK_BTHOME_ENCRYPTION)
+#define ACTIVE_BTHOME_PAYLOAD bthome_encrypted_payload
+#else
+#define ACTIVE_BTHOME_PAYLOAD bthome_payload
+#endif
+
 static const struct bt_data zmk_bthome_ad[] = {
     BT_DATA_BYTES(BT_DATA_FLAGS, BT_LE_AD_GENERAL | BT_LE_AD_NO_BREDR),
     // TOOD device name
-    BT_DATA(BT_DATA_SVC_DATA16, bthome_payload.bytes, sizeof(bthome_payload)),
+    BT_DATA(BT_DATA_SVC_DATA16, ACTIVE_BTHOME_PAYLOAD.bytes, sizeof(ACTIVE_BTHOME_PAYLOAD)),
 };
 
 struct zmk_bthome_button_event
@@ -130,6 +167,40 @@ static void zmkbthome_button_queue_work_handler(struct k_work *work)
         }
 
         LOG_INF("BTHome advertiser created in work");
+
+#if IS_ENABLED(CONFIG_ZMK_BTHOME_ENCRYPTION)
+        {
+            static bt_addr_le_t id_addrs[CONFIG_BT_ID_MAX];
+            size_t count = 1;
+            bt_id_get(id_addrs, &count);
+            if (count > 0)
+            {
+                uint8_t addr[6];
+                memcpy(addr, id_addrs[BT_ID_DEFAULT].a.val, 6);
+                zmk_bthome_encrypt_init(addr);
+                LOG_INF("BTHome encryption initialized with BT ID address");
+            }
+            else
+            {
+                LOG_ERR("No BT ID address available for BTHome encryption");
+            }
+
+            /* Initialize random replay counter */
+        }
+        {
+            int rc = sys_csrand_get(&bthome_encrypted_payload.data.counter,
+                                    sizeof(bthome_encrypted_payload.data.counter));
+            if (rc != 0)
+            {
+                LOG_ERR("Failed to initialize BTHome encryption replay counter: %d", rc);
+                bthome_encrypted_payload.data.counter = sys_rand32_get(); // using non-crypto RNG as fallback
+            }
+            else
+            {
+                LOG_INF("BTHome encryption replay counter initialized");
+            }
+        }
+#endif
     }
 
     // Clear all buttons, then set only the one from the event
@@ -147,6 +218,22 @@ static void zmkbthome_button_queue_work_handler(struct k_work *work)
 
     bthome_payload.data.packet_id.data++;
 
+#if IS_ENABLED(CONFIG_ZMK_BTHOME_ENCRYPTION)
+    bthome_encrypted_payload.data.counter =
+        sys_cpu_to_le32(sys_le32_to_cpu(bthome_encrypted_payload.data.counter) + 1);
+
+    int enc_rc = zmk_bthome_encrypt_payload(
+        (bthome_payload.bytes + PAYLOAD_CONTENT_OFFSET), PAYLOAD_CONTENT_SIZE,
+        bthome_encrypted_payload.data.counter,
+        bthome_encrypted_payload.data.encrypted_data,
+        bthome_encrypted_payload.data.mic);
+    if (enc_rc != 0)
+    {
+        LOG_ERR("BTHome payload encryption failed: %d", enc_rc);
+        return;
+    }
+#endif
+
     int rc = bt_le_ext_adv_set_data(bthome_adv, zmk_bthome_ad, ARRAY_SIZE(zmk_bthome_ad), NULL, 0);
     if (rc != 0)
     {
@@ -154,7 +241,7 @@ static void zmkbthome_button_queue_work_handler(struct k_work *work)
         return;
     }
 
-    rc = bt_le_ext_adv_start(bthome_adv, BT_LE_EXT_ADV_START_PARAM(60, 5));
+    rc = bt_le_ext_adv_start(bthome_adv, BT_LE_EXT_ADV_START_PARAM(100, 10));
     if (rc == 0)
     {
         bthome_adv_active = true;

@@ -7,6 +7,7 @@
 #pragma once
 
 #include <stdint.h>
+#include <stddef.h>
 
 // BTHome device information, from https://bthome.io/format/
 #define ZMK_BTHOME_ENCRYPTION_FLAG 0x01
@@ -25,12 +26,21 @@
 #define ZMK_BTHOME_SERVICE_UUID_1 0xd2
 #define ZMK_BTHOME_SERVICE_UUID_2 0xfc
 
-// TODO fix this if, not using correct config right now
-#if IS_ENABLED(CONFIG_BTHOME_ENCRYPTION)
+// Device info includes encryption flag when configured
+#if IS_ENABLED(CONFIG_ZMK_BTHOME_ENCRYPTION)
 #define ZMK_BTHOME_DEVICE_INFO \
     (ZMK_BTHOME_VERSION_2 | ZMK_BTHOME_TRIGGER_BASED_FLAG | ZMK_BTHOME_ENCRYPTION_FLAG)
 #else
 #define ZMK_BTHOME_DEVICE_INFO (ZMK_BTHOME_VERSION_2 | ZMK_BTHOME_TRIGGER_BASED_FLAG)
+#endif
+
+#define BTHOME_ENCRYPT_TAG_LEN 4
+
+#if IS_ENABLED(CONFIG_ZMK_BTHOME_ENCRYPTION)
+void zmk_bthome_encrypt_init(const uint8_t ble_addr[6]);
+int zmk_bthome_encrypt_payload(const uint8_t *plaintext, const size_t plaintext_len,
+                               const uint32_t replay_counter, uint8_t *enc_out,
+                               uint8_t mic_out[BTHOME_ENCRYPT_TAG_LEN]);
 #endif
 
 int zmk_bthome_queue_button_event(uint8_t index, uint8_t button_code);
