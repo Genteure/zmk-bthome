@@ -142,16 +142,17 @@ TODO support sending from the source side?
 
 ### Device Name
 
-TODO
-
-By default, the BTHome device name will be the value of `CONFIG_ZMK_KEYBOARD_NAME`. If that is not set, it will default to `ZMK-XXXXXX`, where `XXXXXX` are the last 6 digits of the device's MAC address.
+By default, the BTHome device name will be the value of `CONFIG_ZMK_KEYBOARD_NAME`, or "ZMK" if keyboard name is not set.
 
 You can override the device name by setting `CONFIG_ZMK_BTHOME_DEVICE_NAME` in your keyboard's `.conf` file:
 
 ```kconfig
-# Up to 15 characters
-CONFIG_ZMK_BTHOME_DEVICE_NAME="My Keyboard Right"
+CONFIG_ZMK_BTHOME_DEVICE_NAME="My Keyboard"
 ```
+
+Home Assistant by default will append last 4 characters of the MAC address to the device name. You can always change the display name in Home Assistant so setting a custom device name here is not strictly necessary.
+
+Setting `CONFIG_ZMK_BTHOME_DEVICE_NAME=""` (empty string) will remove the device name from the advertisement entirely, leaving more space for the BTHome payload.
 
 ### Encryption
 
@@ -173,22 +174,19 @@ Here's a cryptographically secure one-liner to paste into your browser console:
 
 ### Size Limitations
 
-BLE advertisement packets have a maximum size of 31 bytes. There are 5 bytes of required protocol overhead, another 5 bytes for the BTHome header, leaving 21 bytes for the actual payload.
+BLE advertisement packets have a maximum size of 31 bytes. There are 3 bytes of BLE flags, another 7 bytes of BTHome related header, leaving 21 bytes for the payload content.
+
+Each type of data takes different amounts of space:
 
 - Battery Level: 2 bytes
 - Battery Voltage: 3 bytes
 - Button: 2 bytes each
-- Encryption: 8 bytes if enabled
+
+Encryption will take an additional 8 bytes if enabled.
 
 If `CONFIG_ZMK_BTHOME_DEVICE_NAME` is set, that takes up additional `sizeof(CONFIG_ZMK_BTHOME_DEVICE_NAME) + 2` bytes in the advertisement packet.
 
-If the total data exceeds the size limit, we will fail to build with the error:
-
-TODO build time size checking not yet implemented
-
-```txt
-ERROR: BTHome payload size (xx bytes for name + xx bytes for payload) exceeds maximum advertisement packet size (26 bytes)
-```
+If the total data exceeds the size limit, build will fail with error `BTHome advertisement payload exceeds maximum advertisement size`.
 
 ### Advertising Parameters
 

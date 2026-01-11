@@ -108,9 +108,25 @@ static union
 
 static const struct bt_data zmk_bthome_ad[] = {
     BT_DATA_BYTES(BT_DATA_FLAGS, BT_LE_AD_GENERAL | BT_LE_AD_NO_BREDR),
-    // TOOD device name
+#if IS_ENABLED(CONFIG_ZMK_BTHOME_DEVICE_NAME_NOT_EMPTY)
+    BT_DATA(BT_DATA_NAME_COMPLETE,
+            CONFIG_ZMK_BTHOME_DEVICE_NAME,
+            sizeof(CONFIG_ZMK_BTHOME_DEVICE_NAME) - 1),
+#endif
+
     BT_DATA(BT_DATA_SVC_DATA16, ACTIVE_BTHOME_PAYLOAD.bytes, sizeof(ACTIVE_BTHOME_PAYLOAD)),
 };
+
+//   sizeof(name) - 1 (for null) + 2 (for header)
+// = sizeof(name) + 1
+#define NAME_LENGTH                                          \
+    COND_CODE_1(CONFIG_ZMK_BTHOME_DEVICE_NAME_NOT_EMPTY,     \
+                (sizeof(CONFIG_ZMK_BTHOME_DEVICE_NAME) + 1), \
+                (0))
+
+// BUILD_ASSERT((NAME_LENGTH + sizeof(ACTIVE_BTHOME_PAYLOAD)) <= 29,
+//              "BTHome advertisement payload exceeds maximum advertisement size");
+// TODO fix build time size checking
 
 struct zmk_bthome_button_event
 {

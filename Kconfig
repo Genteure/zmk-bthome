@@ -42,11 +42,14 @@ config ZMK_BTHOME_BATTERY_VOLTAGE
 
 config ZMK_BTHOME_DEVICE_NAME
 	string "BTHome device name"
-	default ""
+	default ZMK_KEYBOARD_NAME if ZMK_KEYBOARD_NAME != ""
+	default "ZMK"
 	help
-	  Override the BTHome advertised device name (up to 15 characters).
-	  When empty, the name will default to CONFIG_ZMK_KEYBOARD_NAME if set,
-	  otherwise a MAC-derived value like "ZMK-XXXXXX" will be used.
+	  BTHome advertised device name. Can be set to empty to omit
+	  the name entirely.
+
+config ZMK_BTHOME_DEVICE_NAME_NOT_EMPTY
+	def_bool ZMK_BTHOME_DEVICE_NAME != ""
 
 config ZMK_BTHOME_ENCRYPTION
 	bool "Enable BTHome encryption"
