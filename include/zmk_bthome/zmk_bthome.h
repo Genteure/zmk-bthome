@@ -27,7 +27,7 @@
 #define ZMK_BTHOME_SERVICE_UUID_2 0xfc
 
 // Device info includes encryption flag when configured
-#if IS_ENABLED(CONFIG_ZMK_BTHOME_ENCRYPTION)
+#if IS_ENABLED(CONFIG_ZMK_BTHOME_ENCRYPTION_ENABLED)
 #define ZMK_BTHOME_DEVICE_INFO \
     (ZMK_BTHOME_VERSION_2 | ZMK_BTHOME_TRIGGER_BASED_FLAG | ZMK_BTHOME_ENCRYPTION_FLAG)
 #else
@@ -36,7 +36,7 @@
 
 #define BTHOME_ENCRYPT_TAG_LEN 4
 
-#if IS_ENABLED(CONFIG_ZMK_BTHOME_ENCRYPTION)
+#if IS_ENABLED(CONFIG_ZMK_BTHOME_ENCRYPTION_ENABLED)
 void zmk_bthome_encrypt_init(const uint8_t ble_addr[6]);
 int zmk_bthome_encrypt_payload(const uint8_t *plaintext, const size_t plaintext_len,
                                const uint32_t replay_counter, uint8_t *enc_out,

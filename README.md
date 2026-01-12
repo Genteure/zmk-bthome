@@ -8,36 +8,56 @@ ZMK BTHome is a [ZMK module](https://zmk.dev/docs/features/modules) that adds su
 
 ## Features
 
-This module allows ZMK-powered keyboards to send the following data:
-
+- BLE BTHome v2 advertisements
+- Optional encryption
 - Battery Level (percentage) and Battery Voltage
-- Buttons (0, 1 or more, with all press types)
+- Configurable amount of buttons with all press types
+- Optional custom device name
 
 ## Installation
 
-Add this module to your `config/west.yml`, see <https://zmk.dev/docs/features/modules#building-with-modules> for more details.
+Add this module to your `config/west.yml`:
 
-In your keyboard's `.conf` file, enable the module:
+```yaml
+manifest:
+  remotes:
+    # ... existing remotes ...
+    - name: genteure
+      url-base: https://github.com/genteure
+  projects:
+    # ... existing projects ...
+    - name: zmk-bthome
+      remote: genteure
+      revision: main
+  # ... other manifest entries ...
+```
+
+See <https://zmk.dev/docs/features/modules#building-with-modules> for more information on adding modules to your ZMK build.
+
+Then in your keyboard's `.conf` file (`config/keyboard_name.conf`), enable ZMK BTHome:
 
 ```kconfig
 CONFIG_ZMK_BTHOME=y
 CONFIG_BT_EXT_ADV_MAX_ADV_SET=2
 ```
 
+This module builds with ZMK `v0.3` and the to-be-0.4 `main` branch. Tested working on an actual keyboard with ZMK `main` branch as of January 2026.
+
 ## Configuration
 
-### Battery
+### Device Name
 
-Battery level and battery voltage reporting are enabled by default. To disable them, add the following to your keyboard's `.conf` file:
+By default, the BTHome device name will be the value of `CONFIG_ZMK_KEYBOARD_NAME`, or "ZMK" if keyboard name is not set.
+
+You can override the device name by setting `CONFIG_ZMK_BTHOME_DEVICE_NAME` in your keyboard's `.conf` file:
 
 ```kconfig
-# Disable battery level reporting
-CONFIG_ZMK_BTHOME_BATTERY_LEVEL=n
-# Disable battery voltage reporting
-CONFIG_ZMK_BTHOME_BATTERY_VOLTAGE=n
+CONFIG_ZMK_BTHOME_DEVICE_NAME="A"
 ```
 
-For split keyboards, each keyboard part will independently report its own battery level and voltage.
+Setting `CONFIG_ZMK_BTHOME_DEVICE_NAME=""` (empty string) will remove the device name entry from the advertisement entirely, leaving more space for BTHome sensor data. Removing the device name does not affect how Home Assistant identifies the device and is highly recommended if encryption is enabled. See Size Limitations section below for details.
+
+Home Assistant by default will use the device name + last 4 characters of the MAC address as the display name, or "BTHome sensor XXXX" if the device name is empty. You can always change the display name in Home Assistant so setting a custom device name here is not strictly necessary.
 
 ### Buttons
 
@@ -48,7 +68,8 @@ Buttons are ZMK behaviors. Add any number of bthome button behaviors to your key
 
 / {
     behaviors {
-        bthome0: bthome_button0 { // name can be anything, but ORDER matters
+        // name can be anything, but ORDER matters
+        bthome0: bthome_button0 {
             compatible = "zmk,behavior-bthome-button";
             #binding-cells = <1>;
             display-name = "BTHome Button 1"; // Optional, shown in ZMK Studio
@@ -136,35 +157,39 @@ Compose with ZMK built-in behaviors like hold-tap and tap-dance to create real "
 };
 ```
 
-For split keyboards, button presses will be reported from the central side.
+For split keyboards, button presses will be reported from the central side only, since keymap processing happens there.
 
 TODO support sending from the source side?
 
-### Device Name
+### Battery
 
-By default, the BTHome device name will be the value of `CONFIG_ZMK_KEYBOARD_NAME`, or "ZMK" if keyboard name is not set.
-
-You can override the device name by setting `CONFIG_ZMK_BTHOME_DEVICE_NAME` in your keyboard's `.conf` file:
+Battery level and battery voltage reporting are enabled by default. To disable them, add the following to your keyboard's `.conf` file:
 
 ```kconfig
-CONFIG_ZMK_BTHOME_DEVICE_NAME="My Keyboard"
+# Disable battery level reporting
+CONFIG_ZMK_BTHOME_BATTERY_LEVEL=n
+# Disable battery voltage reporting
+CONFIG_ZMK_BTHOME_BATTERY_VOLTAGE=n
 ```
 
-Home Assistant by default will append last 4 characters of the MAC address to the device name. You can always change the display name in Home Assistant so setting a custom device name here is not strictly necessary.
-
-Setting `CONFIG_ZMK_BTHOME_DEVICE_NAME=""` (empty string) will remove the device name from the advertisement entirely, leaving more space for the BTHome payload.
+For split keyboards, each keyboard part will independently report its own battery level and voltage.
 
 ### Encryption
 
 By default, BTHome advertisements are unencrypted. You can enable encryption by setting the following options in your keyboard's `.conf` file:
 
 ```kconfig
-CONFIG_ZMK_BTHOME_ENCRYPTION=y
 # 16-byte (32 hex characters) encryption key
 CONFIG_ZMK_BTHOME_ENCRYPTION_KEY="00112233445566778899AABBCCDDEEFF"
 ```
 
-Home Assistant will prompt you to enter the bind key (a.k.a. encryption key) in the Integrations/Devices page.
+You can use the same encryption key across multiple keyboard parts. Home Assistant will prompt you to enter the bind key (a.k.a. encryption key) in the Integrations/Devices page.
+
+Enabling encryption takes up more space in the advertisement packet, see the Size Limitations section below.
+
+As of Home Assistant 2026.1, you can't remove the bind key from an existing BTHome device. See <https://github.com/home-assistant/core/pull/159646>.
+
+Encryption prevents observers from seeing your button presses and battery status, but doesn't fully prevent replay attacks. As of writing (January 2026), advertisements with encryption counter less than 100 are accepted even if they are less than the last received counter to allow device restarts, and the assumption is the counter will start from 0 on restart.
 
 Here's a cryptographically secure one-liner to paste into your browser console:
 
@@ -174,7 +199,7 @@ Here's a cryptographically secure one-liner to paste into your browser console:
 
 ### Size Limitations
 
-BLE advertisement packets have a maximum size of 31 bytes. There are 3 bytes of BLE flags, another 7 bytes of BTHome related header, leaving 21 bytes for the payload content.
+BLE advertisement packets have a maximum size of 31 bytes. There are 3 bytes of BLE flags, another 7 bytes of BTHome related header, leaving just **21 bytes** for the payload.
 
 Each type of data takes different amounts of space:
 
@@ -184,9 +209,45 @@ Each type of data takes different amounts of space:
 
 Encryption will take an additional 8 bytes if enabled.
 
-If `CONFIG_ZMK_BTHOME_DEVICE_NAME` is set, that takes up additional `sizeof(CONFIG_ZMK_BTHOME_DEVICE_NAME) + 2` bytes in the advertisement packet.
+If `CONFIG_ZMK_BTHOME_DEVICE_NAME` is set, that takes up an additional `sizeof(CONFIG_ZMK_BTHOME_DEVICE_NAME) + 2` bytes in the advertisement packet.
 
 If the total data exceeds the size limit, build will fail with error `BTHome advertisement payload exceeds maximum advertisement size`.
+
+#### Example 1
+
+- 0 bytes: `CONFIG_ZMK_BTHOME_DEVICE_NAME=""` (empty string)
+- 2 bytes: Battery Level
+- 3 bytes: Battery Voltage
+- 8 bytes: 4 buttons
+- 8 bytes: Encryption overhead
+- Total: **21** bytes
+
+#### Example 2
+
+- 5 bytes: `CONFIG_ZMK_BTHOME_DEVICE_NAME="ZMK"` (3 characters + 2 bytes header)
+- 2 bytes: Battery Level
+- 3 bytes: Battery Voltage
+- 2 bytes: 1 button
+- 0 bytes: No encryption
+- Total: **12** bytes
+
+#### Example 3
+
+- 7 bytes: `CONFIG_ZMK_BTHOME_DEVICE_NAME="Corne"` (5 characters + 2 bytes header)
+- 2 bytes: Battery Level
+- 3 bytes: Battery Voltage
+- 8 bytes: 4 buttons
+- 0 bytes: No encryption
+- Total: **20** bytes
+
+#### Example 4
+
+- 11 bytes: `CONFIG_ZMK_BTHOME_DEVICE_NAME="nice name"` (9 characters + 2 bytes header)
+- 2 bytes: Battery Level
+- 3 bytes: Battery Voltage
+- 0 bytes: No buttons
+- 8 bytes: Encryption overhead
+- Total: **24** bytes -> Build fails
 
 ### Advertising Parameters
 
@@ -203,7 +264,7 @@ By default, each BTHome event is advertised for up to 1 second (100 * 10 ms) or 
 
 You can adjust these values to balance between time spent advertising each BTHome event and reliability of receiving the advertisements. Too low values may result in missed events.
 
-(We're using "events" to refer to BTHome events. To avoid confusion, we use "packets" to refer to what Zephyr calls "advertising events".)
+(To avoid confusion, we're using "events" to refer to BTHome/Home Assistant events and "packets" for what Zephyr calls "advertising events".)
 
 ## License
 

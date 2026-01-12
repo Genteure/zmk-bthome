@@ -51,22 +51,18 @@ config ZMK_BTHOME_DEVICE_NAME
 config ZMK_BTHOME_DEVICE_NAME_NOT_EMPTY
 	def_bool ZMK_BTHOME_DEVICE_NAME != ""
 
-config ZMK_BTHOME_ENCRYPTION
-	bool "Enable BTHome encryption"
-	default n
-	select CRYPTO
-	select CRYPTO_MBEDTLS_SHIM
-	select MBEDTLS_CIPHER_CCM_ENABLED
-	help
-	  Enable BTHome v2 encryption for sensor payloads. Requires setting
-	  ZMK_BTHOME_ENCRYPTION_KEY to a valid 16-byte key.
-
 config ZMK_BTHOME_ENCRYPTION_KEY
 	string "BTHome encryption key (hex)"
 	default ""
 	help
 	  Provide a 16-byte key as 32 hexadecimal characters to enable
 	  BTHome v2 encryption. Leave empty to send unencrypted payloads.
+
+config ZMK_BTHOME_ENCRYPTION_ENABLED
+	def_bool ZMK_BTHOME_ENCRYPTION_KEY != ""
+	select CRYPTO
+	select CRYPTO_MBEDTLS_SHIM
+	select MBEDTLS_CIPHER_CCM_ENABLED
 
 endif # ZMK_BTHOME
 
