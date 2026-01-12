@@ -254,13 +254,13 @@ If the total data exceeds the size limit, build will fail with error `BTHome adv
 You can customize the advertising timeout and number of packets sent per interval by setting the following options in your keyboard's `.conf` file:
 
 ```kconfig
-# Advertising timeout in units of 10 ms (default: 100, i.e., 1000 ms)
-CONFIG_ZMK_BTHOME_ADV_TIMEOUT=100
-# Number of advertising packets sent per interval (default: 10)
-CONFIG_ZMK_BTHOME_ADV_PACKETS=10
+# Advertising timeout in units of 10 ms (default: 500, i.e., 5000 ms)
+CONFIG_ZMK_BTHOME_ADV_TIMEOUT=500
+# Number of advertising packets sent per interval (default: 24)
+CONFIG_ZMK_BTHOME_ADV_PACKETS=24
 ```
 
-By default, each BTHome event is advertised for up to 1 second (100 * 10 ms) or up to 10 times during that period, whichever comes first. Multiple BTHome events occurring right after each other will be queued and advertised sequentially.
+By default, each BTHome event is advertised for up to 1 second (100 * 10 ms) or up to 10 times during that period, whichever comes first. Multiple BTHome button presses in quick succession will be combined into a single advertisement payload, with the last event for each button taking precedence.
 
 You can adjust these values to balance between time spent advertising each BTHome event and reliability of receiving the advertisements. Too low values may result in missed events.
 

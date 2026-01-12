@@ -192,14 +192,6 @@ static void zmkbthome_button_queue_work_handler(struct k_work *work)
         return;
     }
 
-    struct zmk_bthome_button_event evt;
-    if (k_msgq_get(&zmkbthome_button_msgq, &evt, K_NO_WAIT) != 0)
-    {
-        return;
-    }
-
-    LOG_INF("BTHome sending button event: index=%d code=0x%02x", evt.index, evt.code);
-
     // Not creating in SYS_INIT callback because bt_id is loaded after that
     // and bt is not ready yet at that time. bt_le_ext_adv_create will return -EAGAIN.
     if (bthome_adv == NULL)
@@ -241,24 +233,62 @@ static void zmkbthome_button_queue_work_handler(struct k_work *work)
     }
 
 #if BTHOME_BUTTON_NUM == 0
-    LOG_DBG("No BTHome buttons configured, sending everything else");
+    {
+        /* Drain the queue but we have no button slots to apply; a battery-only
+         * update (BTHOME_BTN_NONE) is still meaningful. */
+        bool got_event = false;
+        struct zmk_bthome_button_event evt;
+        while (k_msgq_get(&zmkbthome_button_msgq, &evt, K_NO_WAIT) == 0)
+        {
+            got_event = true;
+            if (evt.code != BTHOME_BTN_NONE)
+            {
+                LOG_DBG("got BTHome event, index=%d", evt.index);
+            }
+        }
+
+        if (!got_event)
+        {
+            return;
+        }
+        LOG_DBG("No BTHome buttons configured, sending everything else");
+    }
 #else
-    // Clear all buttons, then set only the one from the event
+    /* Start with all buttons cleared, then read queued events and apply
+     * each to the advertisement payload so the last write wins. */
     for (int i = 0; i < BTHOME_BUTTON_NUM; i++)
     {
         bthome_payload.data.buttons[i].data = BTHOME_BTN_NONE;
     }
 
-    // BTHOME_BTN_NONE come from battery updates,
-    // buttons array could have 0 elements if no buttons are configured.
-    if (evt.code != BTHOME_BTN_NONE)
     {
-        LOG_DBG("Setting BTHome button index %d to code 0x%02x", evt.index, evt.code);
-        bthome_payload.data.buttons[evt.index].data = evt.code;
-    }
-    else
-    {
-        LOG_DBG("BTHome button event is BTHOME_BTN_NONE; not setting any button");
+        bool got_event = false;
+        struct zmk_bthome_button_event evt;
+        while (k_msgq_get(&zmkbthome_button_msgq, &evt, K_NO_WAIT) == 0)
+        {
+            got_event = true;
+
+            if (evt.code == BTHOME_BTN_NONE)
+            {
+                /* Battery-only placeholder; do not set any button. */
+                continue;
+            }
+
+            if (evt.index >= BTHOME_BUTTON_NUM)
+            {
+                LOG_WRN("Dropping BTHome event for invalid button index %d", evt.index);
+                continue;
+            }
+
+            bthome_payload.data.buttons[evt.index].data = evt.code;
+        }
+
+        if (!got_event)
+        {
+            return;
+        }
+
+        LOG_INF("BTHome sending queued button event(s)");
     }
 #endif
 
