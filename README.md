@@ -174,6 +174,19 @@ CONFIG_ZMK_BTHOME_BATTERY_VOLTAGE=n
 
 For split keyboards, each keyboard part will independently report its own battery level and voltage.
 
+### Packet ID
+
+Packet ID can help receivers identify distinct advertisement packets and discard duplicates. It is enabled by default unless encryption is enabled or if building for peripheral side of a split keyboard. To explicitly enable or disable packet ID, set the following option in your keyboard's `.conf` file:
+
+```kconfig
+# Disable packet ID in BTHome advertisements
+CONFIG_ZMK_BTHOME_PACKET_ID=n
+```
+
+When encryption is enabled, the encryption counter serves the same purpose as packet ID, so packet ID is disabled to save 2 bytes in the advertisement packet.
+
+For split peripherals, BTHome receviers should provide enough deduplication on their own side. Having packet ID enabled could potentially reduce data reliability if it's frequently reset (e.g., deep sleep) and keeps sending packet IDs that have already been seen by the receiver.
+
 ### Encryption
 
 By default, BTHome advertisements are unencrypted. You can enable encryption by setting the following options in your keyboard's `.conf` file:
@@ -199,10 +212,11 @@ Here's a cryptographically secure one-liner to paste into your browser console:
 
 ### Size Limitations
 
-BLE advertisement packets have a maximum size of 31 bytes. There are 3 bytes of BLE flags, another 7 bytes of BTHome related header, leaving just **21 bytes** for the payload.
+BLE advertisement packets have a maximum size of 31 bytes. BLE flags take 3 bytes and BTHome related header takes another 5, leaving just **23 bytes** available for the payload.
 
 Each type of data takes different amounts of space:
 
+- Packet ID: 2 bytes
 - Battery Level: 2 bytes
 - Battery Voltage: 3 bytes
 - Button: 2 bytes each
@@ -216,6 +230,7 @@ If the total data exceeds the size limit, build will fail with error `BTHome adv
 #### Example 1
 
 - 0 bytes: `CONFIG_ZMK_BTHOME_DEVICE_NAME=""` (empty string)
+- 0 bytes: No Packet ID
 - 2 bytes: Battery Level
 - 3 bytes: Battery Voltage
 - 8 bytes: 4 buttons
@@ -225,24 +240,27 @@ If the total data exceeds the size limit, build will fail with error `BTHome adv
 #### Example 2
 
 - 5 bytes: `CONFIG_ZMK_BTHOME_DEVICE_NAME="ZMK"` (3 characters + 2 bytes header)
+- 2 bytes: Packet ID
 - 2 bytes: Battery Level
 - 3 bytes: Battery Voltage
 - 2 bytes: 1 button
 - 0 bytes: No encryption
-- Total: **12** bytes
+- Total: **14** bytes
 
 #### Example 3
 
 - 7 bytes: `CONFIG_ZMK_BTHOME_DEVICE_NAME="Corne"` (5 characters + 2 bytes header)
+- 2 bytes: Packet ID
 - 2 bytes: Battery Level
 - 3 bytes: Battery Voltage
 - 8 bytes: 4 buttons
 - 0 bytes: No encryption
-- Total: **20** bytes
+- Total: **22** bytes
 
 #### Example 4
 
 - 11 bytes: `CONFIG_ZMK_BTHOME_DEVICE_NAME="nice name"` (9 characters + 2 bytes header)
+- 0 bytes: Packet ID
 - 2 bytes: Battery Level
 - 3 bytes: Battery Voltage
 - 0 bytes: No buttons

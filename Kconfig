@@ -24,6 +24,13 @@ config ZMK_BTHOME_ADV_PACKETS
 	  for each BTHome event. Higher values increase reliability
 	  of delivery at the cost of longer advertisement duration.
 
+config ZMK_BTHOME_PACKET_ID
+	bool "Include packet ID in BTHome advertisements"
+	default y if !ZMK_BTHOME_ENCRYPTION_ENABLED || (ZMK_SPLIT && !ZMK_BLE_SPLIT_ROLE_CENTRAL)
+	help
+	  Include a packet ID in BTHome advertisements to help
+	  receivers identify and discard duplicate packets.
+
 config ZMK_BTHOME_BATTERY_LEVEL
 	bool "Report battery level"
 	default y

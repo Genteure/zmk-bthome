@@ -55,8 +55,9 @@ struct zmk_bthome_payload
 {
     const uint8_t uuid[2];
     const uint8_t device_info;
-
+#if IS_ENABLED(CONFIG_ZMK_BTHOME_PACKET_ID)
     struct zmk_bthome_obj8 packet_id;
+#endif
 #if IS_ENABLED(CONFIG_ZMK_BTHOME_BATTERY_LEVEL)
     struct zmk_bthome_obj8 battery_level;
 #endif
@@ -76,7 +77,9 @@ static union
     .data = {
         .uuid = {BT_UUID_16_ENCODE(ZMK_BTHOME_SERVICE_UUID)},
         .device_info = ZMK_BTHOME_DEVICE_INFO,
+#if IS_ENABLED(CONFIG_ZMK_BTHOME_PACKET_ID)
         .packet_id = {.obj_id = ZMK_BTHOME_OBJECT_ID_PACKET_ID, .data = 0},
+#endif
 
 #if IS_ENABLED(CONFIG_ZMK_BTHOME_BATTERY_LEVEL)
         .battery_level = {.obj_id = ZMK_BTHOME_OBJECT_ID_BATTERY, .data = 0},
@@ -154,7 +157,7 @@ static const struct bt_data zmk_bthome_ad[] = {
 
 // 26 includes:
 // header for the name + the name (if enabled)
-// uuid(2) + device_info(1) + packet_id(2)
+// uuid(2) + device_info(1) + packet_id(2 if enabled)
 // rest of the payload
 // encryption overhead (if enabled)
 
@@ -292,7 +295,9 @@ static void zmkbthome_button_queue_work_handler(struct k_work *work)
     }
 #endif
 
+#if IS_ENABLED(CONFIG_ZMK_BTHOME_PACKET_ID)
     bthome_payload.data.packet_id.data++;
+#endif
 
 #if IS_ENABLED(CONFIG_ZMK_BTHOME_ENCRYPTION_ENABLED)
     bthome_encrypted_payload.data.counter =
